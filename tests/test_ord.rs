@@ -1,7 +1,9 @@
-#![cfg(feature="serde")]
+#![cfg(feature = "serde")]
 
-#[macro_use] extern crate serde;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 extern crate ordcode;
 extern crate serde_bytes;
@@ -12,7 +14,7 @@ use std::fmt::Debug;
 
 use ordcode::*;
 
-use serde::de::{ DeserializeOwned };
+use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
 fn serialize_asc<T: Serialize + ?Sized>(v: &T) -> Result<Vec<u8>> {
@@ -33,11 +35,12 @@ fn deserialize_desc<T: DeserializeOwned>(b: &mut [u8]) -> Result<T> {
 
 // Basic tests mostly adapted from 'bincode' crate
 fn the_same<V>(element: V)
-    where V: Serialize + DeserializeOwned + PartialEq + Debug + 'static,
+where
+    V: Serialize + DeserializeOwned + PartialEq + Debug + 'static,
 {
     let test_same = |element, order: Order| {
-        let mut buf = [0_u8; 1<<16];
-        let len =  ser_to_buf_ordered(&mut buf, &element, order).unwrap();
+        let mut buf = [0_u8; 1 << 16];
+        let len = ser_to_buf_ordered(&mut buf, &element, order).unwrap();
         let decoded: V = de_from_bytes_ordered(&mut buf[..len], order).unwrap();
 
         //if element != decoded { println!("MISMATCH {:#?}: {:#?} {:#?}", order, &buf[..len], decoded); }
@@ -118,7 +121,6 @@ fn test_basic_struct() {
     });
 }
 
-
 #[test]
 fn test_nested_struct() {
     #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -186,7 +188,10 @@ fn test_enum() {
     the_same(TestEnum::OneArg(4));
     the_same(TestEnum::Args(4, 5));
     the_same(TestEnum::AnotherNoArg);
-    the_same(TestEnum::StructLike { x: 4, y: std::f32::consts::PI });
+    the_same(TestEnum::StructLike {
+        x: 4,
+        y: std::f32::consts::PI,
+    });
     the_same(vec![
         TestEnum::NoArg,
         TestEnum::OneArg(5),
@@ -344,12 +349,11 @@ fn serde_bytes() {
     the_same(ByteBuf::from(vec![1, 2, 3, 4, 5]));
 }
 
-
 #[test]
 fn test_vec_parse() {
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     struct Foo {
-        xstr:   String,
+        xstr: String,
         xbytes: Vec<u8>,
     }
 
@@ -374,7 +378,7 @@ fn test_byteseq() {
     let mut v = vec![];
     for j in 0..255 {
         for i in 0..255 {
-            v.push((i^j) as u8);
+            v.push((i ^ j) as u8);
         }
     }
     the_same(v);

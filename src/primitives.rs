@@ -18,7 +18,11 @@
 //! ### Parameters
 //! Encoding parameters are passed via impl of `EncodingParams` (usually ZST struct).
 
-use crate::{Result, Error, buf::{ReadBytes, WriteBytes}, params::{EncodingParams, Order, Endianness}};
+use crate::{
+    buf::{ReadBytes, WriteBytes},
+    params::{EncodingParams, Endianness, Order},
+    Error, Result,
+};
 use core::convert::TryInto;
 
 /// Serializable value
@@ -36,30 +40,30 @@ pub const VERSION: u8 = 1;
 macro_rules! ord_cond {
     ($param:ident, $desc:expr, $asc:expr) => {
         match <$param>::ORDER {
-            Order::Ascending|Order::Unordered => { $asc },
-            Order::Descending =>  { $desc },
+            Order::Ascending | Order::Unordered => $asc,
+            Order::Descending => $desc,
         }
-    }
+    };
 }
 
 macro_rules! to_bytes {
     ($param:ident, $v:expr) => {
         &match <$param>::ENDIANNESS {
             Endianness::Little => $v.to_le_bytes(),
-            Endianness::Big    => $v.to_be_bytes(),
+            Endianness::Big => $v.to_be_bytes(),
             Endianness::Native => $v.to_ne_bytes(),
         }
-    }
+    };
 }
 
 macro_rules! from_bytes {
     ($param:ident, $ut:ty, $v:expr) => {
         match <$param>::ENDIANNESS {
             Endianness::Little => <$ut>::from_le_bytes($v.try_into().unwrap()),
-            Endianness::Big    => <$ut>::from_be_bytes($v.try_into().unwrap()),
+            Endianness::Big => <$ut>::from_be_bytes($v.try_into().unwrap()),
             Endianness::Native => <$ut>::from_ne_bytes($v.try_into().unwrap()),
         }
-    }
+    };
 }
 
 // Ordered serialization of integers
@@ -67,13 +71,18 @@ macro_rules! serialize_int {
     ($ut:ty, $it:ty) => {
         impl SerializableValue for $ut {
             #[inline]
-            fn to_writer<P: EncodingParams>(&self, mut writer: impl WriteBytes, _params: P) -> Result
-            {
-                writer.write(to_bytes!(P, &{ord_cond!(P, !*self, *self)}))
+            fn to_writer<P: EncodingParams>(
+                &self,
+                mut writer: impl WriteBytes,
+                _params: P,
+            ) -> Result {
+                writer.write(to_bytes!(P, &{ ord_cond!(P, !*self, *self) }))
             }
             #[inline]
-            fn from_reader<P: EncodingParams>(mut reader: impl ReadBytes, _params: P) -> Result<Self>
-            {
+            fn from_reader<P: EncodingParams>(
+                mut reader: impl ReadBytes,
+                _params: P,
+            ) -> Result<Self> {
                 const N: usize = core::mem::size_of::<$ut>();
                 reader.read(N, |buf| {
                     let rv = from_bytes!(P, $ut, buf);
@@ -83,20 +92,18 @@ macro_rules! serialize_int {
         }
         impl SerializableValue for $it {
             #[inline]
-            fn to_writer<P: EncodingParams>(&self, writer: impl WriteBytes, params: P) -> Result
-            {
+            fn to_writer<P: EncodingParams>(&self, writer: impl WriteBytes, params: P) -> Result {
                 ((self ^ <$it>::min_value()) as $ut).to_writer(writer, params)
             }
             #[inline]
-            fn from_reader<P: EncodingParams>(reader: impl ReadBytes, params: P) -> Result<Self>
-            {
-                <$ut>::from_reader(reader, params).map(|u| { (u as $it) ^ <$it>::min_value() })
+            fn from_reader<P: EncodingParams>(reader: impl ReadBytes, params: P) -> Result<Self> {
+                <$ut>::from_reader(reader, params).map(|u| (u as $it) ^ <$it>::min_value())
             }
         }
-    }
+    };
 }
 
-serialize_int!(u8,  i8);
+serialize_int!(u8, i8);
 serialize_int!(u16, i16);
 serialize_int!(u32, i32);
 serialize_int!(u64, i64);
@@ -131,7 +138,11 @@ macro_rules! serialize_float {
     ($ft:ty, $ift:ty, $uft:ty) => {
         impl SerializableValue for $ft {
             #[inline]
-            fn to_writer<P: EncodingParams>(&self, mut writer: impl WriteBytes, _params: P) -> Result {
+            fn to_writer<P: EncodingParams>(
+                &self,
+                mut writer: impl WriteBytes,
+                _params: P,
+            ) -> Result {
                 let t = self.to_bits() as $ift;
                 let ov = if matches!(P::ENDIANNESS, Endianness::Big) {
                     const MSBOFFS: usize = core::mem::size_of::<$ift>() * 8 - 1; // # of bits - 1
@@ -153,15 +164,14 @@ macro_rules! serialize_float {
                 }
             }
         }
-    }
+    };
 }
 
 serialize_float!(f32, i32, u32);
 serialize_float!(f64, i64, u64);
 
 /// Bitwise invert contents of a buffer
-pub fn invert_buffer(buf: &mut [u8])
-{
+pub fn invert_buffer(buf: &mut [u8]) {
     for b in buf {
         *b = !*b;
     }

@@ -1,25 +1,30 @@
 //! Types and traits for working with serialization and deserialization buffers
 //!
-use crate::{Result, Error};
+use crate::{Error, Result};
 
 /// Simple byte reader from buffer
 ///
 /// If you need to read from `&[u8]`, you may use [`DeBytesReader`] provided by this crate.
 pub trait ReadBytes {
     /// Peek `n` bytes from head
-    fn peek<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R>;
+    fn peek<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>;
 
     /// Advance buffer head by `n` bytes. `n` should be smaller than remaining buffer size.
     fn advance(&mut self, n: usize);
 
     /// Get `n` bytes from the beginning of buffer, advance by `n` bytes
-    fn read<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R> {
+    fn read<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
+    {
         let r = self.peek(n, f)?;
         self.advance(n);
         Ok(r)
     }
     /// Returns view into remaining buffer
-    fn remaining_buffer(&mut self) -> &'_[u8];
+    fn remaining_buffer(&mut self) -> &'_ [u8];
 
     /// Check if buffer is fully consumed (empty)
     fn is_complete(&mut self) -> Result {
@@ -33,13 +38,18 @@ pub trait ReadBytes {
 
 /// Trait for reading from the tail of byte buffer
 pub trait TailReadBytes: ReadBytes {
-    fn peek_tail<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R>;
+    fn peek_tail<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>;
 
     /// Advance buffer head by `n` bytes. `n` should be smaller than remaining buffer size.
     fn advance_tail(&mut self, n: usize);
 
     /// Get `n` bytes from the beginning of buffer, advance by `n` bytes
-    fn read_tail<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R> {
+    fn read_tail<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
+    {
         let r = self.peek_tail(n, f)?;
         self.advance_tail(n);
         Ok(r)
@@ -47,19 +57,33 @@ pub trait TailReadBytes: ReadBytes {
 }
 
 // forwarding for being able to use `&mut ReadBytes` in place of `ReadBytes`
-impl<'a, T> ReadBytes for &'a mut T where T: ReadBytes  {
-    fn peek<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R> {
+impl<'a, T> ReadBytes for &'a mut T
+where
+    T: ReadBytes,
+{
+    fn peek<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
+    {
         (*self).peek(n, f)
     }
     fn advance(&mut self, n: usize) {
         (*self).advance(n)
     }
-    fn remaining_buffer(&mut self) -> &'_[u8] { (*self).remaining_buffer() }
+    fn remaining_buffer(&mut self) -> &'_ [u8] {
+        (*self).remaining_buffer()
+    }
 }
 
 // forwarding for being able to use `&mut ReadBytes` in place of `ReadBytes`
-impl<'a, T> TailReadBytes for &'a mut T where T: TailReadBytes  {
-    fn peek_tail<F, R>(&mut self, n: usize, f: F) -> Result<R> where F: FnOnce(&[u8]) -> Result<R> {
+impl<'a, T> TailReadBytes for &'a mut T
+where
+    T: TailReadBytes,
+{
+    fn peek_tail<F, R>(&mut self, n: usize, f: F) -> Result<R>
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
+    {
         (*self).peek_tail(n, f)
     }
     fn advance_tail(&mut self, n: usize) {
@@ -76,12 +100,16 @@ pub struct DeBytesReader<'a> {
 
 impl<'a> DeBytesReader<'a> {
     /// Constructs reader from provided byte slice
-    #[must_use] pub fn new(buf: &'a [u8]) -> Self { Self { buf } }
+    #[must_use]
+    pub fn new(buf: &'a [u8]) -> Self {
+        Self { buf }
+    }
 }
 
-impl <'a> ReadBytes for DeBytesReader<'a> {
+impl<'a> ReadBytes for DeBytesReader<'a> {
     fn peek<F, R>(&mut self, n: usize, f: F) -> Result<R>
-        where F: FnOnce(&[u8]) -> Result<R>,
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
     {
         if n <= self.buf.len() {
             f(&self.buf[..n])
@@ -92,14 +120,16 @@ impl <'a> ReadBytes for DeBytesReader<'a> {
     fn advance(&mut self, n: usize) {
         self.buf = &self.buf[n..];
         //println!("after advance {} len={}", n, self.buf.len());
-
     }
-    fn remaining_buffer(&mut self) -> &'_[u8] { self.buf }
+    fn remaining_buffer(&mut self) -> &'_ [u8] {
+        self.buf
+    }
 }
 
 impl<'a> TailReadBytes for DeBytesReader<'a> {
     fn peek_tail<F, R>(&mut self, n: usize, f: F) -> Result<R>
-        where F: FnOnce(&[u8]) -> Result<R>,
+    where
+        F: FnOnce(&[u8]) -> Result<R>,
     {
         if n <= self.buf.len() {
             f(&self.buf[(self.buf.len() - n)..])
@@ -120,23 +150,29 @@ impl<'a> TailReadBytes for DeBytesReader<'a> {
 /// let mut reader = DeBytesReader::new(&buf);
 /// assert_eq!(<u16>::from_reader(ReadFromTail(&mut reader), params::AscendingOrder).unwrap(), 1);
 /// ```
-pub struct ReadFromTail<'a, R>(pub &'a mut R) where R: TailReadBytes;
+pub struct ReadFromTail<'a, R>(pub &'a mut R)
+where
+    R: TailReadBytes;
 
-impl <'a, R> ReadBytes for ReadFromTail<'a, R>
-    where R: TailReadBytes,
+impl<'a, R> ReadBytes for ReadFromTail<'a, R>
+where
+    R: TailReadBytes,
 {
     fn peek<F, RV>(&mut self, n: usize, f: F) -> Result<RV>
-        where F: FnOnce(&[u8]) -> Result<RV>,
+    where
+        F: FnOnce(&[u8]) -> Result<RV>,
     {
         self.0.peek_tail(n, f)
     }
     fn advance(&mut self, n: usize) {
         self.0.advance_tail(n)
     }
-    fn remaining_buffer(&mut self) -> &'_[u8] { self.0.remaining_buffer() }
+    fn remaining_buffer(&mut self) -> &'_ [u8] {
+        self.0.remaining_buffer()
+    }
 }
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 impl std::io::Read for DeBytesReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.buf.read(buf)
@@ -226,10 +262,13 @@ impl<'a> TailWriteBytes for DeBytesWriter<'a> {
 /// 1u16.to_writer(WriteToTail(&mut writer), params::AscendingOrder).unwrap();
 /// assert_eq!(&buf[98..100], &[0, 1]);
 /// ```
-pub struct WriteToTail<'a, W>(pub &'a mut W) where W: TailWriteBytes;
+pub struct WriteToTail<'a, W>(pub &'a mut W)
+where
+    W: TailWriteBytes;
 
 impl<'a, W> WriteBytes for WriteToTail<'a, W>
-    where W: TailWriteBytes
+where
+    W: TailWriteBytes,
 {
     fn write(&mut self, value: &[u8]) -> Result {
         self.0.write_tail(value)
@@ -237,16 +276,26 @@ impl<'a, W> WriteBytes for WriteToTail<'a, W>
 }
 
 // forwarding for being able to use `&mut WriteBytes` in place of `WriteBytes`
-impl<T> WriteBytes for &mut T where T: WriteBytes {
-    fn write(&mut self, buf: &[u8]) -> Result { (*self).write(buf) }
+impl<T> WriteBytes for &mut T
+where
+    T: WriteBytes,
+{
+    fn write(&mut self, buf: &[u8]) -> Result {
+        (*self).write(buf)
+    }
 }
 
-impl<T> TailWriteBytes for &mut T where T: TailWriteBytes {
-    fn write_tail(&mut self, buf: &[u8]) -> Result { (*self).write_tail(buf) }
+impl<T> TailWriteBytes for &mut T
+where
+    T: TailWriteBytes,
+{
+    fn write_tail(&mut self, buf: &[u8]) -> Result {
+        (*self).write_tail(buf)
+    }
 }
 
 /// Pushes data to the vector
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 impl WriteBytes for Vec<u8> {
     fn write(&mut self, buf: &[u8]) -> Result {
         self.extend_from_slice(buf);
@@ -258,7 +307,7 @@ impl WriteBytes for Vec<u8> {
 ///
 /// This means that `Serializer` can write to `Vec<u8>` buffer directly and grow it as needed,
 /// however in this case lexicographic ordering property will not be preserved.
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 impl TailWriteBytes for Vec<u8> {
     fn write_tail(&mut self, buf: &[u8]) -> Result {
         self.extend_from_slice(buf);
@@ -269,10 +318,13 @@ impl TailWriteBytes for Vec<u8> {
 /// Adapter for always writing to buffer head, even for `write_tail()`
 ///
 /// Useful e.g. for appending serialized suffix to the buffer
-pub struct WriteToHead<'a, W>(pub &'a mut W) where W: WriteBytes;
+pub struct WriteToHead<'a, W>(pub &'a mut W)
+where
+    W: WriteBytes;
 
 impl<'a, W> WriteBytes for WriteToHead<'a, W>
-    where W: TailWriteBytes
+where
+    W: TailWriteBytes,
 {
     fn write(&mut self, value: &[u8]) -> Result {
         self.0.write(value)
@@ -280,7 +332,8 @@ impl<'a, W> WriteBytes for WriteToHead<'a, W>
 }
 
 impl<'a, W> TailWriteBytes for WriteToHead<'a, W>
-    where W: TailWriteBytes
+where
+    W: TailWriteBytes,
 {
     fn write_tail(&mut self, value: &[u8]) -> Result {
         self.0.write(value)

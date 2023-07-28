@@ -1,10 +1,9 @@
-
 /// Serialization and deserialization errors
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Error {
     #[doc(hidden)]
-    Serde,  // not used, but need to satisfy serde Error traits
+    Serde(String), // not used, but need to satisfy serde Error traits
     SerializeSequenceMustHaveLength,
     BufferOverflow,
     BufferUnderflow,
@@ -16,14 +15,15 @@ pub enum Error {
     InvalidUtf8Encoding,
     InvalidTagEncoding,
     InvalidVarintEncoding,
-    #[cfg(not(feature="std"))] CannotSerializeDisplayInNoStdContext,
+    #[cfg(not(feature = "std"))]
+    CannotSerializeDisplayInNoStdContext,
 }
 
 impl Error {
     #[cfg(feature = "std")]
     fn descr(&self) -> &str {
         match self {
-            Error::Serde => "serde custom error", // not used
+            Error::Serde(_) => "serde custom error", // not used
             Error::SerializeSequenceMustHaveLength => "serialized sequence must have length",
             Error::BufferOverflow => "serialized data buffer overflow",
             Error::BufferUnderflow => "serialized data buffer underflow",
@@ -35,11 +35,14 @@ impl Error {
             Error::InvalidUtf8Encoding => "invalid UTF-8 encoding",
             Error::InvalidTagEncoding => "invalid encoding for enum tag",
             Error::InvalidVarintEncoding => "invalid varint encoding",
-            #[cfg(not(feature = "std"))] Error::CannotSerializeDisplayInNoStdContext => "", // kill ide warning
+            #[cfg(not(feature = "std"))]
+            Error::CannotSerializeDisplayInNoStdContext => "", // kill ide warning
         }
     }
     #[cfg(not(feature = "std"))]
-    fn descr(&self) -> &str { "" }
+    fn descr(&self) -> &str {
+        ""
+    }
 }
 
 impl core::fmt::Display for Error {
@@ -49,19 +52,19 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-#[cfg(feature="serde")]
-const _: () =  {
+#[cfg(feature = "serde")]
+const _: () = {
     impl serde::ser::Error for Error {
         fn custom<T: core::fmt::Display>(_msg: T) -> Self {
-            Self::Serde
+            Self::Serde(_msg.to_string())
         }
     }
     impl serde::de::Error for Error {
         fn custom<T: core::fmt::Display>(_msg: T) -> Self {
-            Self::Serde
+            Self::Serde(_msg.to_string())
         }
     }
 };

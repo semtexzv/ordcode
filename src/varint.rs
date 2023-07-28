@@ -2,8 +2,11 @@
 //! Fast variable length serialization of unsigned integers with [`VarUInt`] trait.
 //!
 //! This trait is implemented by this crate for [`u32`], [`u64`] integer types.
-use crate::{buf::{ReadBytes, WriteBytes, TailReadBytes, TailWriteBytes, WriteToTail, ReadFromTail},
-            params::LengthEncoder, Result, Error};
+use crate::{
+    buf::{ReadBytes, ReadFromTail, TailReadBytes, TailWriteBytes, WriteBytes, WriteToTail},
+    params::LengthEncoder,
+    Error, Result,
+};
 
 /// Methods for variable length serializaiton of unsigned integers
 pub trait VarUInt: Sized {
@@ -21,7 +24,7 @@ pub trait VarUInt: Sized {
 
     /// Decode variable length integer from slice
     fn varu_from_slice(bytes: &[u8]) -> Result<(Self, u8)>;
-    
+
     /// Encode variable length integer into slice
     ///
     /// Slice must be of enough length, and can be calculated with `varu_encoded_len()`.
@@ -33,30 +36,32 @@ impl VarUInt for u64 {
     #[inline]
     fn varu_encoded_len(&self) -> u8 {
         // indexing const array is twice as fast as 'match' in release mode
-        const LENGTHS: [u8; 65] = [ 9,9,9,9,9,9,9,9,8,8,8,8,8,8,8,7,7,7,7,7,7,7,6,6,6,6,6,6,6,
-            5,5,5,5,5,5,5,4,4,4,4,4,4,4,3,3,3,3,3,3,3,2,2,2,2,2,2,2,1,1,1,1,1,1,1,1 ];
+        const LENGTHS: [u8; 65] = [
+            9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6,
+            5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1,
+            1, 1, 1, 1, 1, 1, 1,
+        ];
         LENGTHS[self.leading_zeros() as usize]
     }
     #[inline]
     fn varu_decoded_len(first_byte: u8) -> u8 {
         #![allow(clippy::cast_possible_truncation)]
-        (first_byte.trailing_zeros() + 1) as u8    
+        (first_byte.trailing_zeros() + 1) as u8
     }
     #[inline]
     fn varu_to_writer(&self, mut writer: impl WriteBytes) -> Result {
         let mut bytes = [0_u8; 9];
         let length = self.varu_to_slice(&mut bytes);
         writer.write(&[bytes[0]])?;
-        writer.write(&bytes[1..length as usize])    
+        writer.write(&bytes[1..length as usize])
     }
     #[inline]
     fn varu_from_reader(mut reader: impl ReadBytes) -> Result<Self> {
-        let (first_byte, varu_decoded_len) = reader.read(1, |buf| {
-            Ok((buf[0], Self::varu_decoded_len(buf[0])))
-        })?;
+        let (first_byte, varu_decoded_len) =
+            reader.read(1, |buf| Ok((buf[0], Self::varu_decoded_len(buf[0]))))?;
         reader.read((varu_decoded_len - 1) as usize, |buf| {
-            varu64_decode(varu_decoded_len, first_byte,buf)
-        })   
+            varu64_decode(varu_decoded_len, first_byte, buf)
+        })
     }
     #[inline]
     fn varu_from_slice(bytes: &[u8]) -> Result<(Self, u8)> {
@@ -64,7 +69,10 @@ impl VarUInt for u64 {
             return Err(Error::PrematureEndOfInput);
         }
         let varu_decoded_len = Self::varu_decoded_len(bytes[0]);
-        Ok((varu64_decode(varu_decoded_len, bytes[0], &bytes[1..])?, varu_decoded_len))   
+        Ok((
+            varu64_decode(varu_decoded_len, bytes[0], &bytes[1..])?,
+            varu_decoded_len,
+        ))
     }
     #[inline]
     fn varu_to_slice(&self, bytes: &mut [u8]) -> u8 {
@@ -76,14 +84,17 @@ impl VarUInt for u64 {
             let encoded = (*self << 1 | 1) << (u64::from(length) - 1);
             bytes[..8].copy_from_slice(&encoded.to_le_bytes());
         }
-        length     
+        length
     }
 }
 
 impl VarUInt for u32 {
     #[inline]
     fn varu_encoded_len(&self) -> u8 {
-        const LENGTHS: [u8; 33] = [ 5,5,5,5,4,4,4,4,4,4,4,3,3,3,3,3,3,3,2,2,2,2,2,2,2,1,1,1,1,1,1,1,1 ];
+        const LENGTHS: [u8; 33] = [
+            5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1,
+            1, 1, 1, 1,
+        ];
         LENGTHS[self.leading_zeros() as usize]
     }
     #[inline]
@@ -95,13 +106,12 @@ impl VarUInt for u32 {
         let mut bytes = [0_u8; 5];
         let length = self.varu_to_slice(&mut bytes);
         writer.write(&[bytes[0]])?;
-        writer.write(&bytes[1..length as usize])   
+        writer.write(&bytes[1..length as usize])
     }
     #[inline]
     fn varu_from_reader(mut reader: impl ReadBytes) -> Result<Self> {
-        let (first_byte, varu_decoded_len) = reader.read(1, |buf| {
-            Ok((buf[0], Self::varu_decoded_len(buf[0])))
-        })?;
+        let (first_byte, varu_decoded_len) =
+            reader.read(1, |buf| Ok((buf[0], Self::varu_decoded_len(buf[0]))))?;
         if varu_decoded_len <= 5 {
             reader.read((varu_decoded_len - 1) as usize, |buf| {
                 varu32_decode(varu_decoded_len, first_byte, buf)
@@ -117,7 +127,10 @@ impl VarUInt for u32 {
         }
         let varu_decoded_len = Self::varu_decoded_len(bytes[0]);
         if varu_decoded_len <= 5 {
-            Ok((varu32_decode(varu_decoded_len, bytes[0], &bytes[1..])?, varu_decoded_len))
+            Ok((
+                varu32_decode(varu_decoded_len, bytes[0], &bytes[1..])?,
+                varu_decoded_len,
+            ))
         } else {
             Err(Error::InvalidVarintEncoding)
         }
@@ -152,7 +165,7 @@ fn varu64_decode(varu_encoded_length: u8, first_byte: u8, bytes: &[u8]) -> Resul
     } else {
         encoded[0] = first_byte;
         let len = varu_encoded_length as usize;
-        encoded[1..len as usize].copy_from_slice(&bytes[..len-1]);
+        encoded[1..len as usize].copy_from_slice(&bytes[..len - 1]);
         u64::from_le_bytes(encoded) >> varu_encoded_length
     };
     #[cfg(debug_assertions)]
@@ -177,7 +190,7 @@ fn varu32_decode(varu_encoded_length: u8, first_byte: u8, bytes: &[u8]) -> Resul
     } else {
         encoded[0] = first_byte;
         let len = varu_encoded_length as usize;
-        encoded[1..len].copy_from_slice(&bytes[..len-1]);
+        encoded[1..len].copy_from_slice(&bytes[..len - 1]);
         u32::from_le_bytes(encoded) >> varu_encoded_length
     };
     #[cfg(debug_assertions)]

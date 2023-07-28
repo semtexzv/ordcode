@@ -1,6 +1,9 @@
-use crate::{Error, Result, params::{SerializerParams, LengthEncoder}};
-use serde::{ser, Serialize };
+use crate::{
+    params::{LengthEncoder, SerializerParams},
+    Error, Result,
+};
 use core::mem::size_of;
+use serde::{ser, Serialize};
 
 /// Serialized object size calculator
 ///
@@ -9,21 +12,35 @@ use core::mem::size_of;
 /// Calculation process is inexpensive, for fixed-size objects it evaluates to compile-time constant,
 /// or a few `len()` method calls for variable-size objects (when compiling in release mode).
 pub struct SizeCalc<P> {
-    size:   usize,
+    size: usize,
     _marker: core::marker::PhantomData<P>,
 }
 
-impl<P> SizeCalc<P> where P: SerializerParams {
-    #[must_use] #[inline]
-    pub fn new() -> Self { Self { size: 0, _marker: core::marker::PhantomData } }
+impl<P> SizeCalc<P>
+where
+    P: SerializerParams,
+{
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            size: 0,
+            _marker: core::marker::PhantomData,
+        }
+    }
 
-    #[must_use] #[inline]
+    #[must_use]
+    #[inline]
     /// Returns calculated size
-    pub fn size(&self) -> usize { self.size }
+    pub fn size(&self) -> usize {
+        self.size
+    }
 
     // add serialized size of primitive type
     #[inline]
-    fn add_ty<T>(&mut self) { self.size += size_of::<T>(); }
+    fn add_ty<T>(&mut self) {
+        self.size += size_of::<T>();
+    }
 
     // add serialized length of sequence length or discriminant value
     #[inline]
@@ -36,8 +53,13 @@ impl<P> SizeCalc<P> where P: SerializerParams {
     }
 }
 
-impl<P> Default for SizeCalc<P> where P: SerializerParams {
-    fn default() -> Self { Self::new() }
+impl<P> Default for SizeCalc<P>
+where
+    P: SerializerParams,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 macro_rules! serialize_fn {
@@ -47,11 +69,12 @@ macro_rules! serialize_fn {
             self.add_ty::<$t>();
             Ok(())
         }
-    }
+    };
 }
 
 impl<'a, P> ser::Serializer for &'a mut SizeCalc<P>
-    where P: SerializerParams,
+where
+    P: SerializerParams,
 {
     type Ok = ();
     type Error = Error;
@@ -65,21 +88,21 @@ impl<'a, P> ser::Serializer for &'a mut SizeCalc<P>
     type SerializeStructVariant = SerializeCompound<'a, P>;
 
     serialize_fn!(serialize_bool, bool);
-    serialize_fn!(serialize_u8,   u8);
-    serialize_fn!(serialize_u16,  u16);
-    serialize_fn!(serialize_u32,  u32);
-    serialize_fn!(serialize_u64,  u64);
-    serialize_fn!(serialize_i8,   i8);
-    serialize_fn!(serialize_i16,  i16);
-    serialize_fn!(serialize_i32,  i32);
-    serialize_fn!(serialize_i64,  i64);
-    serialize_fn!(serialize_f32,  f32);
-    serialize_fn!(serialize_f64,  f64);
+    serialize_fn!(serialize_u8, u8);
+    serialize_fn!(serialize_u16, u16);
+    serialize_fn!(serialize_u32, u32);
+    serialize_fn!(serialize_u64, u64);
+    serialize_fn!(serialize_i8, i8);
+    serialize_fn!(serialize_i16, i16);
+    serialize_fn!(serialize_i32, i32);
+    serialize_fn!(serialize_i64, i64);
+    serialize_fn!(serialize_f32, f32);
+    serialize_fn!(serialize_f64, f64);
     serde_if_integer128! {
         serialize_fn!(serialize_u128,  u128);
         serialize_fn!(serialize_i128,  i128);
     }
-    serialize_fn!(serialize_char,  char);
+    serialize_fn!(serialize_char, char);
     #[inline]
     fn serialize_str(self, v: &str) -> Result {
         self.serialize_bytes(v.as_ref())
@@ -97,35 +120,48 @@ impl<'a, P> ser::Serializer for &'a mut SizeCalc<P>
     }
     #[inline]
     fn serialize_some<T>(self, value: &T) -> Result
-        where T: ?Sized + Serialize,
+    where
+        T: ?Sized + Serialize,
     {
         self.add_ty::<u8>();
         value.serialize(self)
     }
     #[inline]
-    fn serialize_unit(self) -> Result { Ok(()) }
+    fn serialize_unit(self) -> Result {
+        Ok(())
+    }
 
     #[inline]
     fn serialize_unit_struct(self, _name: &'static str) -> Result {
         self.serialize_unit()
     }
     #[inline]
-    fn serialize_unit_variant(self, _name: &'static str, variant_index: u32,
-                              _variant: &'static str) -> Result {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        variant_index: u32,
+        _variant: &'static str,
+    ) -> Result {
         self.add_discriminant_size(variant_index);
         Ok(())
     }
     #[inline]
     fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result
-        where T: ?Sized + Serialize,
+    where
+        T: ?Sized + Serialize,
     {
         value.serialize(self)
     }
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(self, _name: &'static str,
-                                            variant_index: u32, _variant: &'static str,
-                                            value: &T) -> Result
-        where T: serde::ser::Serialize,
+    fn serialize_newtype_variant<T: ?Sized>(
+        self,
+        _name: &'static str,
+        variant_index: u32,
+        _variant: &'static str,
+        value: &T,
+    ) -> Result
+    where
+        T: serde::ser::Serialize,
     {
         self.add_discriminant_size(variant_index);
         value.serialize(self)
@@ -182,9 +218,11 @@ impl<'a, P> ser::Serializer for &'a mut SizeCalc<P>
         Ok(SerializeCompound { ser: self })
     }
     #[cfg(not(feature = "std"))]
-    fn collect_str<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error> where
-        T: core::fmt::Display {
-            Err(Error::CannotSerializeDisplayInNoStdContext)
+    fn collect_str<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: core::fmt::Display,
+    {
+        Err(Error::CannotSerializeDisplayInNoStdContext)
     }
 }
 
@@ -195,14 +233,16 @@ pub struct SerializeCompound<'a, P> {
 macro_rules! seq_compound_impl {
     ($tn:ident, $fn:ident) => {
         impl<'a, P> serde::ser::$tn for SerializeCompound<'a, P>
-            where P: SerializerParams,
+        where
+            P: SerializerParams,
         {
             type Ok = ();
             type Error = Error;
 
             #[inline]
             fn $fn<T: ?Sized>(&mut self, value: &T) -> Result
-                where T: serde::ser::Serialize,
+            where
+                T: serde::ser::Serialize,
             {
                 value.serialize(&mut *self.ser)
             }
@@ -211,25 +251,27 @@ macro_rules! seq_compound_impl {
                 Ok(())
             }
         }
-    }
+    };
 }
 
-seq_compound_impl!(SerializeSeq,   serialize_element);
+seq_compound_impl!(SerializeSeq, serialize_element);
 seq_compound_impl!(SerializeTuple, serialize_element);
-seq_compound_impl!(SerializeTupleStruct,  serialize_field);
+seq_compound_impl!(SerializeTupleStruct, serialize_field);
 seq_compound_impl!(SerializeTupleVariant, serialize_field);
 
 macro_rules! struct_compound_impl {
     ($tn:ident) => {
         impl<'a, P> serde::ser::$tn for SerializeCompound<'a, P>
-            where P: SerializerParams,
+        where
+            P: SerializerParams,
         {
             type Ok = ();
             type Error = Error;
 
             #[inline]
             fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result
-                where T: serde::ser::Serialize,
+            where
+                T: serde::ser::Serialize,
             {
                 value.serialize(&mut *self.ser)
             }
@@ -238,7 +280,7 @@ macro_rules! struct_compound_impl {
                 Ok(())
             }
         }
-    }
+    };
 }
 
 struct_compound_impl!(SerializeStruct);
@@ -248,15 +290,17 @@ macro_rules! serialize_mapitem {
     ($fn:ident) => {
         #[inline]
         fn $fn<T: ?Sized>(&mut self, value: &T) -> Result
-            where T: serde::ser::Serialize,
+        where
+            T: serde::ser::Serialize,
         {
             value.serialize(&mut *self.ser)
         }
-    }
+    };
 }
 
 impl<'a, P> serde::ser::SerializeMap for SerializeCompound<'a, P>
-    where P: SerializerParams,
+where
+    P: SerializerParams,
 {
     type Ok = ();
     type Error = Error;
@@ -264,5 +308,7 @@ impl<'a, P> serde::ser::SerializeMap for SerializeCompound<'a, P>
     serialize_mapitem!(serialize_key);
     serialize_mapitem!(serialize_value);
     #[inline]
-    fn end(self) -> Result { Ok(()) }
+    fn end(self) -> Result {
+        Ok(())
+    }
 }

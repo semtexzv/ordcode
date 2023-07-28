@@ -1,4 +1,4 @@
-use ordcode::{ *, varint::*  };
+use ordcode::{varint::*, *};
 
 // Varint tests are adopted and modified from VInt implementation, github.com/iqlusioninc/veriform
 // Original Copyright © 2017-2020 Tony Arcieri
@@ -22,7 +22,6 @@ fn encode32(value: u32) -> Box<[u8]> {
 fn decode32(bytes: &[u8]) -> Result<(u32, u8)> {
     <u32>::varu_from_slice(bytes)
 }
-
 
 #[test]
 fn encode_zero() {

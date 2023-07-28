@@ -2,7 +2,10 @@
 //!
 #![allow(clippy::module_name_repetitions)]
 
-use crate::{varint, Result, buf::{TailReadBytes, TailWriteBytes}};
+use crate::{
+    buf::{TailReadBytes, TailWriteBytes},
+    varint, Result,
+};
 
 /// lexicographic ordering for serialization
 ///
@@ -13,7 +16,7 @@ pub enum Order {
     Ascending,
     Descending,
     /// For use by other crates. For the purposes of `ordcode`, same as [`Ascending`](Order::Ascending).
-    Unordered
+    Unordered,
 }
 
 /// Endianness representation for serialized integers
@@ -41,10 +44,10 @@ pub trait EncodingParams: Copy {
 /// Parameters for implementations of `serde` serializer and deserializer
 pub trait SerializerParams: EncodingParams {
     /// Encoder for sequence lengths
-    type SeqLenEncoder: LengthEncoder<Value=usize>;
+    type SeqLenEncoder: LengthEncoder<Value = usize>;
 
     /// Encoder for discriminant values
-    type DiscriminantEncoder: LengthEncoder<Value=u32>;
+    type DiscriminantEncoder: LengthEncoder<Value = u32>;
 }
 
 /// Encoder for array lengths, enum discriminants etc.
@@ -58,12 +61,18 @@ pub trait LengthEncoder {
     fn write(writer: impl TailWriteBytes, value: Self::Value) -> Result;
 }
 
-impl<T> EncodingParams for &T where T: EncodingParams {
+impl<T> EncodingParams for &T
+where
+    T: EncodingParams,
+{
     const ORDER: Order = T::ORDER;
     const ENDIANNESS: Endianness = T::ENDIANNESS;
 }
 
-impl <T> SerializerParams for &T where T: SerializerParams {
+impl<T> SerializerParams for &T
+where
+    T: SerializerParams,
+{
     type SeqLenEncoder = T::SeqLenEncoder;
     type DiscriminantEncoder = T::DiscriminantEncoder;
 }

@@ -49,38 +49,49 @@
 
 #![crate_name = "ordcode"]
 #![deny(clippy::all, clippy::pedantic)]
-#![allow(clippy::missing_errors_doc, clippy::map_err_ignore )]
+#![allow(clippy::missing_errors_doc, clippy::map_err_ignore)]
 
-#[cfg(feature="serde")] #[macro_use] extern crate serde;
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
 
-#[macro_use] mod errors;
+#[macro_use]
+mod errors;
+
 #[doc(inline)]
 pub use errors::Error;
 
 /// A convenient Result type
 pub type Result<T = (), E = errors::Error> = core::result::Result<T, E>;
 
-#[macro_use] pub mod primitives;
-pub mod varint;
+#[macro_use]
+pub mod primitives;
 pub mod bytes_esc;
+pub mod varint;
 
-pub mod params;
 pub mod buf;
+pub mod params;
 
+pub use buf::{DeBytesReader, DeBytesWriter, ReadFromTail, WriteToTail};
 #[doc(inline)]
 pub use params::Order;
-pub use buf::{DeBytesReader, DeBytesWriter, ReadFromTail, WriteToTail };
 
-#[cfg(feature="serde")] mod size_calc;
-#[cfg(feature="serde")] mod ord_ser;
-#[cfg(feature="serde")] mod ord_de;
+#[cfg(feature = "serde")]
+mod ord_de;
+#[cfg(feature = "serde")]
+mod ord_ser;
+#[cfg(feature = "serde")]
+mod size_calc;
 
 #[doc(inline)]
-#[cfg(feature="serde")] pub use ord_ser::Serializer;
+#[cfg(feature = "serde")]
+pub use ord_de::Deserializer;
 #[doc(inline)]
-#[cfg(feature="serde")] pub use ord_de::Deserializer;
+#[cfg(feature = "serde")]
+pub use ord_ser::Serializer;
 #[doc(inline)]
-#[cfg(feature="serde")] pub use size_calc::SizeCalc;
+#[cfg(feature = "serde")]
+pub use size_calc::SizeCalc;
 
 /// Current version of data encoding format for [`Serializer`] parametrized with
 /// some [`params::SerializerParams`].
@@ -105,10 +116,11 @@ pub trait FormatVersion<P: params::SerializerParams> {
 /// let data_size = calc_size(&foo, params::AscendingOrder).unwrap();
 /// assert_eq!(data_size, 6);
 /// ```
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 pub fn calc_size<T, P>(value: &T, _params: P) -> Result<usize>
-    where T: ?Sized + serde::ser::Serialize,
-          P: params::SerializerParams,
+where
+    T: ?Sized + serde::ser::Serialize,
+    P: params::SerializerParams,
 {
     let mut sc = size_calc::SizeCalc::<P>::new();
     value.serialize(&mut sc)?;
@@ -116,9 +128,10 @@ pub fn calc_size<T, P>(value: &T, _params: P) -> Result<usize>
 }
 
 /// Convenience method: same as [`calc_size()`], with [`params::AscendingOrder`]
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 pub fn calc_size_asc<T>(value: &T) -> Result<usize>
-    where T: ?Sized + serde::ser::Serialize,
+where
+    T: ?Sized + serde::ser::Serialize,
 {
     calc_size(value, params::AscendingOrder)
 }
@@ -145,9 +158,10 @@ pub fn calc_size_asc<T>(value: &T) -> Result<usize>
 /// assert_eq!(&buf[2..5], b"abc");
 /// assert_eq!(buf[5], 7); // last byte is string length (3) in varint encoding
 /// ```
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 pub fn ser_to_buf_ordered<T>(buf: &mut [u8], value: &T, order: Order) -> Result<usize>
-    where T: ?Sized + serde::ser::Serialize,
+where
+    T: ?Sized + serde::ser::Serialize,
 {
     let mut de_buf = DeBytesWriter::new(buf);
     let mut ser = new_ser_asc(&mut de_buf);
@@ -181,9 +195,10 @@ pub fn ser_to_buf_ordered<T>(buf: &mut [u8], value: &T, order: Order) -> Result<
 /// assert_eq!(&buf[2..5], b"abc");
 /// assert_eq!(buf[5], 7); // last byte is string length (3) in varint encoding
 /// ```
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 pub fn ser_to_buf_asc_exact<T>(buf: &mut [u8], value: &T) -> Result
-    where T: ?Sized + serde::ser::Serialize,
+where
+    T: ?Sized + serde::ser::Serialize,
 {
     let mut de_buf = DeBytesWriter::new(buf);
     let mut ser = new_ser_asc(&mut de_buf);
@@ -206,9 +221,10 @@ pub fn ser_to_buf_asc_exact<T>(buf: &mut [u8], value: &T) -> Result
 /// assert_eq!(&buf[2..5], b"abc");
 /// assert_eq!(buf[5], 7); // last byte is string length (3) in varint encoding
 /// ```
-#[cfg(all(feature="std", feature="serde"))]
+#[cfg(all(feature = "std", feature = "serde"))]
 pub fn ser_to_vec_ordered<T>(value: &T, order: Order) -> Result<Vec<u8>>
-    where T: ?Sized + serde::ser::Serialize,
+where
+    T: ?Sized + serde::ser::Serialize,
 {
     let mut byte_buf = vec![0_u8; calc_size(value, params::AscendingOrder)?];
     let mut de_buf = DeBytesWriter::new(byte_buf.as_mut_slice());
@@ -236,15 +252,16 @@ pub fn ser_to_vec_ordered<T>(value: &T, order: Order) -> Result<Vec<u8>>
 /// assert_eq!(foo.0, 1);
 /// assert_eq!(foo.1, "abc");
 /// ```
-#[cfg(feature="serde")]
-pub fn de_from_bytes_asc<I, T>(input: I) -> Result<T>
-    where I: AsRef<[u8]>,
-          T: serde::de::DeserializeOwned,
+#[cfg(feature = "serde")]
+pub fn de_from_bytes_asc<'de, T>(input: &'de [u8]) -> Result<T>
+where
+    T: serde::de::Deserialize<'de>,
 {
     let mut reader = DeBytesReader::new(input.as_ref());
     let mut deser = new_de_asc(&mut reader);
     T::deserialize(&mut deser)
 }
+
 /// Deserialize value from mutable byte slice.
 ///
 /// For [`Order::Descending`], the buffer will be inverted in-place.
@@ -262,10 +279,10 @@ pub fn de_from_bytes_asc<I, T>(input: I) -> Result<T>
 /// assert_eq!(foo.0, 1);
 /// assert_eq!(foo.1, "abc");
 /// ```
-#[cfg(feature="serde")]
-pub fn de_from_bytes_ordered<I, T>(mut input: I, order: Order) -> Result<T>
-    where I: AsMut<[u8]>,
-          T: serde::de::DeserializeOwned,
+#[cfg(feature = "serde")]
+pub fn de_from_bytes_ordered<'de, T>(input: &'de mut [u8], order: Order) -> Result<T>
+where
+    T: serde::de::Deserialize<'de>,
 {
     if matches!(order, Order::Descending) {
         primitives::invert_buffer(input.as_mut());
@@ -276,19 +293,21 @@ pub fn de_from_bytes_ordered<I, T>(mut input: I, order: Order) -> Result<T>
 }
 
 /// Create new default serializer instance (with [`params::AscendingOrder`])
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 #[inline]
 pub fn new_ser_asc<W>(writer: W) -> Serializer<W, params::AscendingOrder>
-    where W: buf::TailWriteBytes,
+where
+    W: buf::TailWriteBytes,
 {
     Serializer::new(writer, params::AscendingOrder)
 }
 
 /// Create new default deserializer instance (with [`params::AscendingOrder`])
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 #[inline]
 pub fn new_de_asc<R>(reader: R) -> Deserializer<R, params::AscendingOrder>
-    where R: buf::TailReadBytes,
+where
+    R: buf::TailReadBytes,
 {
     Deserializer::new(reader, params::AscendingOrder)
 }
