@@ -383,3 +383,17 @@ fn test_byteseq() {
     }
     the_same(v);
 }
+
+#[test]
+fn test_multiseq() {
+    #[derive(Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+    struct Pair(Vec<u8>, Vec<u8>);
+
+    let a = Pair(vec![0xFF], vec![0x00]);
+    let b = Pair(vec![0xFF, 0x00], vec![]);
+
+    assert_eq!(
+        a < b,
+        serialize_asc(&a).unwrap() < serialize_asc(&b).unwrap()
+    )
+}
